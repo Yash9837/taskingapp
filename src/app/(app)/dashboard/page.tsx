@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import Header from '@/components/Header';
 import StatusBadge from '@/components/StatusBadge';
@@ -183,13 +184,17 @@ export default function DashboardPage() {
                 {tasks.slice(0, 6).map((task) => {
                   const project = projects.find(p => p.id === task.projectId);
                   return (
-                    <div key={task.id} className="flex items-center gap-3 px-5 py-3 hover:bg-[var(--bg-hover)] transition-colors">
+                    <Link
+                      key={task.id}
+                      href={`/tasks/${task.id}`}
+                      className="flex items-center gap-3 px-5 py-3 hover:bg-[var(--bg-hover)] transition-colors group"
+                    >
                       <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${task.status === 'done' ? 'bg-emerald-500' :
                         task.status === 'in-progress' ? 'bg-blue-500' :
                           task.status === 'review' ? 'bg-amber-500' : 'bg-zinc-500'
                         }`} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">{task.title}</p>
+                        <p className="text-[13px] font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--accent-light)] transition-colors">{task.title}</p>
                         <p className="text-[11px] text-[var(--text-tertiary)]">{project?.name || 'No project'}</p>
                       </div>
                       <StatusBadge status={task.status} type="task" />
@@ -200,7 +205,7 @@ export default function DashboardPage() {
                         }`}>
                         {task.priority}
                       </span>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>

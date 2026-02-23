@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Header from '@/components/Header';
 import Modal from '@/components/Modal';
 import StatusBadge from '@/components/StatusBadge';
@@ -39,6 +41,7 @@ const PRIORITY_COLORS: Record<TaskPriority, { border: string; badge: string }> =
 };
 
 export default function TasksPage() {
+  const router = useRouter();
   const { user, userData } = useAuth();
   const userRole = userData?.role || 'member';
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -114,21 +117,37 @@ export default function TasksPage() {
   };
 
   const handleEditTask = (task: Task) => {
-    // Members can only update status via quick action, not open the full edit modal
-    if (userRole === 'member') return;
+    console.log('Opening task detail for:', task.id, 'Role:', userRole);
+    try {
+      setSelectedTask(task);
 
-    setSelectedTask(task);
-    setFormData({
-      title: task.title,
-      description: task.description || '',
-      projectId: task.projectId,
-      status: task.status as TaskStatus,
-      priority: task.priority as TaskPriority,
-      assignedTo: task.assignedTo || '',
-      dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
-      tags: task.tags || [],
-    });
-    setShowModal(true);
+      let formattedDueDate = '';
+      if (task.dueDate) {
+        try {
+          const d = new Date(task.dueDate);
+          if (!isNaN(d.getTime())) {
+            formattedDueDate = d.toISOString().split('T')[0];
+          }
+        } catch (e) {
+          console.warn('Invalid due date format:', task.dueDate);
+        }
+      }
+
+      setFormData({
+        title: task.title,
+        description: task.description || '',
+        projectId: task.projectId,
+        status: task.status as TaskStatus,
+        priority: task.priority as TaskPriority,
+        assignedTo: task.assignedTo || '',
+        dueDate: formattedDueDate,
+        tags: task.tags || [],
+      });
+      setShowModal(true);
+      console.log('Modal state set to true');
+    } catch (err) {
+      console.error('Error in handleEditTask:', err);
+    }
   };
 
   const handleQuickStatusChange = async (task: Task, newStatus: TaskStatus) => {
@@ -343,8 +362,14 @@ export default function TasksPage() {
                     tasksByStatus[status].map(task => (
                       <div
                         key={task.id}
-                        className={`p-4 rounded-lg bg-[var(--bg-card-solid)] hover:bg-[var(--bg-hover)] ${canEditTask(userRole) ? 'cursor-pointer' : ''} transition-all border-l-4 ${PRIORITY_COLORS[task.priority as TaskPriority]?.border || 'border-gray-500'}`}
-                        onClick={() => handleEditTask(task)}
+                        className={`p-4 rounded-lg bg-[var(--bg-card-solid)] hover:bg-[var(--bg-hover)] cursor-pointer transition-all border-l-4 ${PRIORITY_COLORS[task.priority as TaskPriority]?.border || 'border-gray-500'}`}
+                        onClick={() => {
+                          if (userRole === 'member') {
+                            router.push(`/tasks/${task.id}`);
+                          } else {
+                            handleEditTask(task);
+                          }
+                        }}
                       >
                         {/* Task Title */}
                         <h3 className="font-semibold text-[var(--text-primary)] mb-2 line-clamp-2">
@@ -488,13 +513,14 @@ export default function TasksPage() {
             {/* Title Input */}
             <div>
               <label className="block text-sm font-medium text-gray-200 mb-2">
-                Title <span className="text-red-400">*</span>
+                Title {userRole !== 'member' && <span className="text-red-400">*</span>}
               </label>
               <input
                 type="text"
                 value={formData.title}
                 onChange={e => setFormData({ ...formData, title: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                readOnly={userRole === 'member'}
+                className={`w-full px-4 py-2 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${userRole === 'member' ? 'opacity-70 cursor-default' : ''}`}
                 placeholder="Enter task title"
               />
             </div>
@@ -507,8 +533,9 @@ export default function TasksPage() {
               <textarea
                 value={formData.description}
                 onChange={e => setFormData({ ...formData, description: e.target.value })}
+                readOnly={userRole === 'member'}
                 rows={3}
-                className="w-full px-4 py-2 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                className={`w-full px-4 py-2 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none ${userRole === 'member' ? 'opacity-70 cursor-default' : ''}`}
                 placeholder="Enter task description"
               />
             </div>
@@ -516,12 +543,13 @@ export default function TasksPage() {
             {/* Project Select */}
             <div>
               <label className="block text-sm font-medium text-gray-200 mb-2">
-                Project <span className="text-red-400">*</span>
+                Project {userRole !== 'member' && <span className="text-red-400">*</span>}
               </label>
               <select
                 value={formData.projectId}
                 onChange={e => setFormData({ ...formData, projectId: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={userRole === 'member'}
+                className={`w-full px-4 py-2 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500 ${userRole === 'member' ? 'opacity-70 cursor-default' : ''}`}
               >
                 <option value="">Select a project</option>
                 {projects.map(p => (
@@ -540,7 +568,8 @@ export default function TasksPage() {
               <select
                 value={formData.assignedTo}
                 onChange={e => setFormData({ ...formData, assignedTo: e.target.value })}
-                className="w-full px-4 py-2 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={userRole === 'member'}
+                className={`w-full px-4 py-2 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500 ${userRole === 'member' ? 'opacity-70 cursor-default' : ''}`}
               >
                 <option value="">Leave Unassigned</option>
                 {assignableMembers.map(m => (
@@ -549,7 +578,7 @@ export default function TasksPage() {
                   </option>
                 ))}
               </select>
-              {assignableMembers.length === 0 && (
+              {assignableMembers.length === 0 && userRole !== 'member' && (
                 <p className="text-xs text-amber-400 mt-1">No members found. Add members first via Settings.</p>
               )}
             </div>
@@ -563,7 +592,8 @@ export default function TasksPage() {
                 <select
                   value={formData.priority}
                   onChange={e => setFormData({ ...formData, priority: e.target.value as TaskPriority })}
-                  className="w-full px-4 py-2 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={userRole === 'member'}
+                  className={`w-full px-4 py-2 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500 ${userRole === 'member' ? 'opacity-70 cursor-default' : ''}`}
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
@@ -581,12 +611,13 @@ export default function TasksPage() {
                   type="date"
                   value={formData.dueDate}
                   onChange={e => setFormData({ ...formData, dueDate: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  readOnly={userRole === 'member'}
+                  className={`w-full px-4 py-2 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500 ${userRole === 'member' ? 'opacity-70 cursor-default' : ''}`}
                 />
               </div>
             </div>
 
-            {/* Status Select (only for editing) */}
+            {/* Status Select (only for editing or view) */}
             {selectedTask && (
               <div>
                 <label className="block text-sm font-medium text-gray-200 mb-2">
@@ -597,7 +628,8 @@ export default function TasksPage() {
                   onChange={e =>
                     setFormData({ ...formData, status: e.target.value as TaskStatus })
                   }
-                  className="w-full px-4 py-2 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={userRole === 'member'}
+                  className={`w-full px-4 py-2 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500 ${userRole === 'member' ? 'opacity-70 cursor-default' : ''}`}
                 >
                   <option value="todo">To Do</option>
                   <option value="in-progress">In Progress</option>
@@ -621,7 +653,8 @@ export default function TasksPage() {
                     tags: e.target.value.split(',').map(t => t.trim()),
                   })
                 }
-                className="w-full px-4 py-2 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                readOnly={userRole === 'member'}
+                className={`w-full px-4 py-2 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${userRole === 'member' ? 'opacity-70 cursor-default' : ''}`}
                 placeholder="e.g. frontend, bug, urgent"
               />
             </div>
@@ -640,26 +673,36 @@ export default function TasksPage() {
               <button
                 onClick={() => setShowModal(false)}
                 disabled={isSubmitting}
-                className="flex-1 px-4 py-2 rounded-lg border border-[var(--border-color)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`flex-1 px-4 py-2 rounded-lg border border-[var(--border-color)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${userRole === 'member' ? 'w-full' : ''}`}
               >
-                Cancel
+                {userRole === 'member' ? 'Close' : 'Cancel'}
               </button>
-              <button
-                onClick={handleSaveTask}
-                disabled={isSubmitting || !formData.title.trim() || !formData.projectId}
-                className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-[var(--text-primary)] rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Saving...
-                  </>
-                ) : selectedTask ? (
-                  'Update Task'
-                ) : (
-                  'Create Task'
-                )}
-              </button>
+              {userRole !== 'member' && selectedTask && (
+                <Link
+                  href={`/tasks/${selectedTask.id}`}
+                  className="flex-1 px-4 py-2 rounded-lg border border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10 font-medium transition-colors flex items-center justify-center"
+                >
+                  View Full Details
+                </Link>
+              )}
+              {userRole !== 'member' && (
+                <button
+                  onClick={handleSaveTask}
+                  disabled={isSubmitting || !formData.title.trim() || !formData.projectId}
+                  className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-[var(--text-primary)] rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Saving...
+                    </>
+                  ) : selectedTask ? (
+                    'Update Task'
+                  ) : (
+                    'Create Task'
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </Modal>

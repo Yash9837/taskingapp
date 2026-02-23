@@ -237,6 +237,25 @@ export async function addTask(
   }
 }
 
+export async function getTask(taskId: string): Promise<Task | null> {
+  try {
+    const taskRef = doc(db, 'tasks', taskId);
+    const snapshot = await getDoc(taskRef);
+
+    if (!snapshot.exists()) {
+      return null;
+    }
+
+    return {
+      id: snapshot.id,
+      ...snapshot.data(),
+    } as Task;
+  } catch (error) {
+    console.error('Error getting task:', error);
+    throw error;
+  }
+}
+
 export async function getTasks(): Promise<Task[]> {
   try {
     const tasksRef = collection(db, 'tasks');
